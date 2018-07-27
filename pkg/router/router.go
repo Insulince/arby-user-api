@@ -20,6 +20,7 @@ func CreateRouter() (router *Router) {
 	router.HandleFunc("/health", api.HealthCheck).Methods("GET")
 
 	router.HandleFunc("/user/register", api.Register).Methods("POST")
+	router.HandleFunc("/user/login", api.Login).Methods("POST")
 
 	router.NotFoundHandler = http.HandlerFunc(api.NotFound)
 

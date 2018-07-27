@@ -80,3 +80,51 @@ func Register(w http.ResponseWriter, r *http.Request) () {
 
 	aw.Respond(responses.Message{Message: "User registered successfully."}, http.StatusOK)
 }
+
+func Login(w http.ResponseWriter, r *http.Request) () {
+	ar, aw := models.NewApiCommunication(r, w)
+
+	rawPostBody, err := ar.GetRequestBody()
+	if err != nil {
+		log.Println(err)
+		aw.Respond(responses.Error{Error: "Could not process request."}, http.StatusInternalServerError)
+		return
+	}
+	type PostBody struct {
+		Username *string `json:"username"`
+		Password *string `json:"password"`
+	}
+	var postBody PostBody
+	err = json.Unmarshal(rawPostBody, &postBody)
+	if err != nil {
+		log.Println(err)
+		aw.Respond(responses.Error{Error: "Could not read request body."}, http.StatusBadRequest)
+		return
+	}
+	if postBody.Username == nil || postBody.Password == nil {
+		log.Println("Malformed request body.")
+		aw.Respond(responses.Error{Error: "Malformed request body."}, http.StatusBadRequest)
+		return
+	}
+
+	user, err := mongo.FindUserByUsername(*postBody.Username)
+	if err != nil {
+		log.Println(err)
+		aw.Respond(responses.Error{Error: "Failed to validate credentials."}, http.StatusInternalServerError)
+		return
+	}
+	if user == nil {
+		log.Printf("No user found for provided username \"%v\"\n", *postBody.Username)
+		aw.Respond(responses.Error{Error: "Invalid username or password."}, http.StatusBadRequest)
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(*postBody.Password))
+	if err != nil {
+		log.Println(err)
+		aw.Respond(responses.Error{Error: "Invalid username or password."}, http.StatusBadRequest)
+		return
+	}
+
+	aw.Respond(responses.Message{Message: "Success."}, http.StatusOK)
+}
