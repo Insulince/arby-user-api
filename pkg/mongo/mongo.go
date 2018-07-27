@@ -3,6 +3,8 @@ package mongo
 import (
 	"gopkg.in/mgo.v2"
 	"arby-user-api/pkg/configuration"
+	"arby-user-api/pkg/models"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const UsersCollectionName = "users"
@@ -22,4 +24,16 @@ func InitializeDatabase(config *configuration.Config) (err error) {
 
 func Users() (users *mgo.Collection) {
 	return db.C(UsersCollectionName)
+}
+
+func InsertUser(user models.User) (err error) {
+	return Users().Insert(user)
+}
+
+func FindUserByUsername(username string) (user *models.User, err error) {
+	err = Users().Find(bson.M{"username": username}).One(&user)
+	if err != nil && err.Error() != "not found" {
+		return nil, err
+	}
+	return user, nil
 }
