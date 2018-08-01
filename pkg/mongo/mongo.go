@@ -30,8 +30,8 @@ func InsertUser(user models.User) (err error) {
 	return Users().Insert(user)
 }
 
-func FindUserByUsername(username string) (user *models.User, err error) {
-	err = Users().Find(bson.M{"username": username}).One(&user)
+func FindUserByEmail(email string) (user *models.User, err error) {
+	err = Users().Find(bson.M{"email": email}).One(&user)
 	if err != nil && err.Error() != "not found" {
 		return nil, err
 	}

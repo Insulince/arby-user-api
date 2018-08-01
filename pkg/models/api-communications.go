@@ -38,6 +38,10 @@ func (ar *ApiRequest) GetRequestBody() (rawRequestBody []byte, err error) {
 	return rawRequestBody, nil
 }
 
+func (ar *ApiRequest) GetHeader(headerName string) (headerValue string) {
+	return ar.Header.Get(headerName)
+}
+
 type ApiResponseWriter struct {
 	http.ResponseWriter
 	*http.Request

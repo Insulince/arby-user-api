@@ -4,11 +4,12 @@ import (
 	"arby-user-api/pkg/models"
 	"net/http"
 	"arby-user-api/pkg/models/responses"
-	"encoding/json"
 	"golang.org/x/crypto/bcrypt"
 	"time"
 	"log"
 	"arby-user-api/pkg/mongo"
+	"encoding/base64"
+	"strings"
 )
 
 func Home(w http.ResponseWriter, r *http.Request) () {
@@ -29,49 +30,55 @@ func NotFound(w http.ResponseWriter, r *http.Request) () {
 func Register(w http.ResponseWriter, r *http.Request) () {
 	ar, aw := models.NewApiCommunication(r, w)
 
-	rawPostBody, err := ar.GetRequestBody()
-	if err != nil {
-		log.Println(err)
-		aw.Respond(responses.Error{Error: "Could not process request."}, http.StatusInternalServerError)
+	authorizationHeader := ar.GetHeader("Authorization")
+	if authorizationHeader == "" {
+		log.Println("Empty/absent \"Authorization\" header value.")
+		aw.Respond(responses.Error{Error: "Empty/absent \"Authorization\" header value."}, http.StatusBadRequest)
 		return
 	}
-	type PostBody struct {
-		Username *string `json:"username"`
-		Password *string `json:"password"`
-	}
-	var postBody PostBody
-	err = json.Unmarshal(rawPostBody, &postBody)
-	if err != nil {
-		log.Println(err)
-		aw.Respond(responses.Error{Error: "Could not read request body."}, http.StatusBadRequest)
+	if strings.Index(authorizationHeader, "Basic ") != 0 {
+		log.Println("Missing \"Basic \" in Authorization header.")
+		aw.Respond(responses.Error{Error: "Malformed Authorization header."}, http.StatusBadRequest)
 		return
 	}
-	if postBody.Username == nil || postBody.Password == nil {
-		log.Println("Malformed request body.")
-		aw.Respond(responses.Error{Error: "Malformed request body."}, http.StatusBadRequest)
+	authorizationHeader = authorizationHeader[6:] // Remove "Basic " from header.
+
+	type Authorization struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var authorization Authorization
+	decodedAuthorizationBytes, err := base64.StdEncoding.DecodeString(authorizationHeader)
+	decodedAuthorizationString := string(decodedAuthorizationBytes)
+	authorization.Email = decodedAuthorizationString[:strings.Index(decodedAuthorizationString, ":")]
+	authorization.Password = decodedAuthorizationString[strings.Index(decodedAuthorizationString, ":")+1:]
+
+	if authorization.Email == "" || authorization.Password == "" {
+		log.Println("Malformed authorization header.")
+		aw.Respond(responses.Error{Error: "Malformed Authorization header."}, http.StatusBadRequest)
 		return
 	}
 
-	user, err := mongo.FindUserByUsername(*postBody.Username)
+	user, err := mongo.FindUserByEmail(authorization.Email)
 	if err != nil {
 		log.Println(err)
-		aw.Respond(responses.Error{Error: "Could not lookup provided username."}, http.StatusInternalServerError)
+		aw.Respond(responses.Error{Error: "Could not lookup provided email."}, http.StatusInternalServerError)
 		return
 	}
 	if user != nil {
-		log.Println("Username already taken.")
-		aw.Respond(responses.Error{Error: "Username already taken."}, http.StatusBadRequest)
+		log.Println("Email already taken.")
+		aw.Respond(responses.Error{Error: "Email already taken."}, http.StatusBadRequest)
 		return
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(*postBody.Password), bcrypt.DefaultCost)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(authorization.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Println(err)
 		aw.Respond(responses.Error{Error: "Could not generate password hash."}, http.StatusInternalServerError)
 		return
 	}
 
-	err = mongo.InsertUser(models.User{Username: *postBody.Username, PasswordHash: passwordHash, CreationTimestamp: time.Now().Unix()})
+	err = mongo.InsertUser(models.User{Email: authorization.Email, PasswordHash: passwordHash, CreationTimestamp: time.Now().Unix()})
 	if err != nil {
 		log.Println(err)
 		aw.Respond(responses.Error{Error: "Could not insert user."}, http.StatusInternalServerError)
@@ -84,45 +91,51 @@ func Register(w http.ResponseWriter, r *http.Request) () {
 func Login(w http.ResponseWriter, r *http.Request) () {
 	ar, aw := models.NewApiCommunication(r, w)
 
-	rawPostBody, err := ar.GetRequestBody()
-	if err != nil {
-		log.Println(err)
-		aw.Respond(responses.Error{Error: "Could not process request."}, http.StatusInternalServerError)
+	authorizationHeader := ar.GetHeader("Authorization")
+	if authorizationHeader == "" {
+		log.Println("Empty/absent \"Authorization\" header value.")
+		aw.Respond(responses.Error{Error: "Empty/absent \"Authorization\" header value."}, http.StatusBadRequest)
 		return
 	}
-	type PostBody struct {
-		Username *string `json:"username"`
-		Password *string `json:"password"`
-	}
-	var postBody PostBody
-	err = json.Unmarshal(rawPostBody, &postBody)
-	if err != nil {
-		log.Println(err)
-		aw.Respond(responses.Error{Error: "Could not read request body."}, http.StatusBadRequest)
+	if strings.Index(authorizationHeader, "Basic ") != 0 {
+		log.Println("Missing \"Basic \" in Authorization header.")
+		aw.Respond(responses.Error{Error: "Malformed Authorization header."}, http.StatusBadRequest)
 		return
 	}
-	if postBody.Username == nil || postBody.Password == nil {
-		log.Println("Malformed request body.")
-		aw.Respond(responses.Error{Error: "Malformed request body."}, http.StatusBadRequest)
+	authorizationHeader = authorizationHeader[6:] // Remove "Basic " from header.
+
+	type Authorization struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+	var authorization Authorization
+	decodedAuthorizationBytes, err := base64.StdEncoding.DecodeString(authorizationHeader)
+	decodedAuthorizationString := string(decodedAuthorizationBytes)
+	authorization.Email = decodedAuthorizationString[:strings.Index(decodedAuthorizationString, ":")]
+	authorization.Password = decodedAuthorizationString[strings.Index(decodedAuthorizationString, ":")+1:]
+
+	if authorization.Email == "" || authorization.Password == "" {
+		log.Println("Malformed authorization header.")
+		aw.Respond(responses.Error{Error: "Malformed Authorization header."}, http.StatusBadRequest)
 		return
 	}
 
-	user, err := mongo.FindUserByUsername(*postBody.Username)
+	user, err := mongo.FindUserByEmail(authorization.Email)
 	if err != nil {
 		log.Println(err)
 		aw.Respond(responses.Error{Error: "Failed to validate credentials."}, http.StatusInternalServerError)
 		return
 	}
 	if user == nil {
-		log.Printf("No user found for provided username \"%v\"\n", *postBody.Username)
-		aw.Respond(responses.Error{Error: "Invalid username or password."}, http.StatusBadRequest)
+		log.Printf("No user found for provided email \"%v\"\n", authorization.Email)
+		aw.Respond(responses.Error{Error: "Invalid email or password."}, http.StatusBadRequest)
 		return
 	}
 
-	err = bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(*postBody.Password))
+	err = bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(authorization.Password))
 	if err != nil {
 		log.Println(err)
-		aw.Respond(responses.Error{Error: "Invalid username or password."}, http.StatusBadRequest)
+		aw.Respond(responses.Error{Error: "Invalid email or password."}, http.StatusBadRequest)
 		return
 	}
 
