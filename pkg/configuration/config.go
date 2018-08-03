@@ -10,9 +10,10 @@ import (
 )
 
 type Config struct {
-	Port  int         `json:"port"`
-	Cors  CorsConfig  `json:"cors"`
-	Mongo MongoConfig `json:"mongo"`
+	Port      int         `json:"port"`
+	JwtSecret string      `json:"jwtSecret"`
+	Cors      CorsConfig  `json:"cors"`
+	Mongo     MongoConfig `json:"mongo"`
 }
 
 type MongoConfig struct {
@@ -39,34 +40,40 @@ func LoadConfig() (config *Config, err error) {
 		}
 		config.Port = int(port)
 	} else {
-		return nil, errors.New("Environment variable \"PORT\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("PORT")
+	}
+
+	if value, present := os.LookupEnv("JWT_SECRET"); present {
+		config.JwtSecret = value
+	} else {
+		return nil, createEnvironmentVariableNotPresentError("JWT_SECRET")
 	}
 
 	if value, present := os.LookupEnv("MONGO_CONNECTION_STRING"); present {
 		config.Mongo.ConnectionString = value
 	} else {
-		return nil, errors.New("Environment variable \"MONGO_CONNECTION_STRING\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("MONGO_CONNECTION_STRING")
 	}
 	if value, present := os.LookupEnv("MONGO_DATABASE_NAME"); present {
 		config.Mongo.DatabaseName = value
 	} else {
-		return nil, errors.New("Environment variable \"MONGO_DATABASE_NAME\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("MONGO_DATABASE_NAME")
 	}
 
 	if value, present := os.LookupEnv("CORS_ALLOWED_ORIGINS"); present {
 		config.Cors.AllowedOrigins = strings.Split(value, ",")
 	} else {
-		return nil, errors.New("Environment variable \"CORS_ALLOWED_ORIGINS\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("CORS_ALLOWED_ORIGINS")
 	}
 	if value, present := os.LookupEnv("CORS_ALLOWED_METHODS"); present {
 		config.Cors.AllowedMethods = strings.Split(value, ",")
 	} else {
-		return nil, errors.New("Environment variable \"CORS_ALLOWED_METHODS\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("CORS_ALLOWED_METHODS")
 	}
 	if value, present := os.LookupEnv("CORS_ALLOWED_HEADERS"); present {
 		config.Cors.AllowedHeaders = strings.Split(value, ",")
 	} else {
-		return nil, errors.New("Environment variable \"CORS_ALLOWED_HEADERS\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("CORS_ALLOWED_HEADERS")
 	}
 	if value, present := os.LookupEnv("CORS_ALLOW_CREDENTIALS"); present {
 		allowCredentials, err := strconv.ParseBool(value)
@@ -75,9 +82,13 @@ func LoadConfig() (config *Config, err error) {
 		}
 		config.Cors.AllowCredentials = allowCredentials
 	} else {
-		return nil, errors.New("Environment variable \"CORS_ALLOW_CREDENTIALS\" not provided!\n")
+		return nil, createEnvironmentVariableNotPresentError("CORS_ALLOW_CREDENTIALS")
 	}
 
 	log.Printf("Successfully loaded config.\n")
 	return config, nil
+}
+
+func createEnvironmentVariableNotPresentError(environmentVariableName string) (err error) {
+	return errors.New(fmt.Sprintf("Environment variable \"%v\" not provided!\n", environmentVariableName))
 }

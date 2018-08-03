@@ -26,7 +26,7 @@ func init() () {
 }
 
 func main() () {
-	r := router.CreateRouter()
+	r := router.CreateRouter(config)
 
 	c := cors.Options{
 		AllowedOrigins:   config.Cors.AllowedOrigins,
