@@ -5,6 +5,7 @@ import (
 	"arby-user-api/pkg/configuration"
 	"arby-user-api/pkg/models"
 	"gopkg.in/mgo.v2/bson"
+	"log"
 )
 
 const UsersCollectionName = "users"
@@ -12,6 +13,8 @@ const UsersCollectionName = "users"
 var db *mgo.Database
 
 func InitializeDatabase(config *configuration.Config) (err error) {
+	log.Println("Initializing mongo database...")
+
 	session, err := mgo.Dial(config.Mongo.ConnectionString)
 	if err != nil {
 		return err
@@ -19,6 +22,7 @@ func InitializeDatabase(config *configuration.Config) (err error) {
 	session.SetMode(mgo.Strong, true)
 	db = session.DB(config.Mongo.DatabaseName)
 
+	log.Println("Database initialized.")
 	return nil
 }
 
